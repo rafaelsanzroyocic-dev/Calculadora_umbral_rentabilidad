@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f4e79">
+<meta name="description" content="Calculadora del umbral de rentabilidad (punto muerto) paso a paso">
+<title>Umbral de Rentabilidad</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --azul:#1f4e79; --azul-claro:#e7eef7; --fondo:#f4f7fb; --texto:#1d2733; --gris:#5d6b7a;
+    --verde:#2e7d32; --rojo:#c62828; --naranja:#d9822b; --borde:#d5dde7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fondo);color:var(--texto);line-height:1.45}
+  header{background:var(--azul);color:#fff;padding:16px 18px}
+  header h1{margin:0;font-size:1.25rem}
+  header p{margin:4px 0 0;font-size:.9rem;opacity:.85}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 12px;font-size:1.05rem;color:var(--azul)}
+  label{display:block;font-weight:600;font-size:.92rem;margin:12px 0 4px}
+  label small{font-weight:400;color:var(--gris)}
+  .campo{display:flex;align-items:center;border:1px solid var(--borde);border-radius:8px;background:#fff;overflow:hidden}
+  .campo:focus-within{border-color:var(--azul);box-shadow:0 0 0 3px var(--azul-claro)}
+  .campo input{flex:1;border:0;padding:11px 12px;font-size:1.05rem;outline:none;min-width:0;background:transparent}
+  .campo span{padding:0 12px;color:var(--gris);font-size:.9rem;white-space:nowrap}
+  .opcion{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:.92rem}
+  .opcion input{width:18px;height:18px}
+  .botones{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  button{border:0;border-radius:8px;padding:11px 16px;font-size:.98rem;cursor:pointer}
+  .primario{background:var(--azul);color:#fff;font-weight:600;flex:1 1 160px}
+  .secundario{background:var(--azul-claro);color:var(--azul)}
+  .error{background:#fdecea;color:var(--rojo);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:.92rem;display:none}
+  .resultado-principal{text-align:center;padding:8px 0 4px}
+  .resultado-principal .cifra{font-size:2.2rem;font-weight:700;color:var(--azul)}
+  .resultado-principal .sub{color:var(--gris);font-size:.92rem}
+  .tabla{width:100%;border-collapse:collapse;margin-top:12px;font-size:.95rem}
+  .tabla td{padding:8px 4px;border-bottom:1px solid var(--borde)}
+  .tabla td:last-child{text-align:right;white-space:nowrap;padding-left:10px;font-variant-numeric:tabular-nums;font-weight:600}
+  .positivo{color:var(--verde)} .negativo{color:var(--rojo)}
+  .comentario{margin-top:12px;padding:10px 12px;border-radius:8px;font-size:.93rem}
+  .comentario.ok{background:#e8f5e9;color:#1b5e20}
+  .comentario.mal{background:#fdecea;color:#8e1c1c}
+  .comentario.neutro{background:var(--azul-claro);color:var(--azul)}
+  .pasos{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;background:#f8fafc;border:1px solid var(--borde);border-radius:8px;padding:12px;white-space:pre-wrap;overflow-x:auto}
+  .leyenda{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--gris);margin-top:6px}
+  .leyenda i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
+  svg text{font-family:system-ui,sans-serif}
+  #salida{display:none}
+  .teoria p{margin:6px 0;font-size:.93rem}
+  footer{text-align:center;color:var(--gris);font-size:.8rem;padding:8px 0 24px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Umbral de Rentabilidad</h1>
+  <p>Punto muerto: ¿cuántas unidades hay que vender para no perder dinero?</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Datos del ejercicio</h2>
+
+    <label for="cf">Costes fijos totales (Cf)</label>
+    <div class="campo"><input id="cf" inputmode="decimal" autocomplete="off" placeholder="Ej.: 58.300"><span>€</span></div>
+
+    <label for="pv">Precio de venta unitario (Pv)</label>
+    <div class="campo"><input id="pv" inputmode="decimal" autocomplete="off" placeholder="Ej.: 125"><span>€/u</span></div>
+
+    <div id="bloqueCvu">
+      <label for="cvu">Coste variable unitario (Cvu)</label>
+      <div class="campo"><input id="cvu" inputmode="decimal" autocomplete="off" placeholder="Ej.: 71,80"><span>€/u</span></div>
+    </div>
+
+    <div id="bloqueCvTotal" style="display:none">
+      <label for="cvt">Costes variables totales (CV)</label>
+      <div class="campo"><input id="cvt" inputmode="decimal" autocomplete="off" placeholder="Ej.: 71.800"><span>€</span></div>
+    </div>
+
+    <label class="opcion"><input type="checkbox" id="modoTotal"> Tengo el coste variable <b>total</b>, no el unitario</label>
+
+    <label for="prod">Producción / ventas reales <small id="prodNota">(opcional)</small></label>
+    <div class="campo"><input id="prod" inputmode="decimal" autocomplete="off" placeholder="Ej.: 1.000"><span>u</span></div>
+
+    <div class="error" id="error"></div>
+
+    <div class="botones">
+      <button class="primario" id="calcular">Calcular</button>
+      <button class="secundario" id="limpiar">Limpiar</button>
+      <button class="secundario" id="ejemplo">Cargar ejemplo</button>
+    </div>
+  </section>
+
+  <div id="salida">
+    <section class="card">
+      <h2>Resultado</h2>
+      <div class="resultado-principal">
+        <div class="cifra" id="qRes">—</div>
+        <div class="sub" id="qSub"></div>
+      </div>
+      <table class="tabla" id="tabla"></table>
+      <div class="comentario" id="comentario"></div>
+    </section>
+
+    <section class="card">
+      <h2>Resolución paso a paso</h2>
+      <div class="pasos" id="pasos"></div>
+    </section>
+
+    <section class="card">
+      <h2>Representación gráfica</h2>
+      <div id="grafico"></div>
+      <div class="leyenda">
+        <span><i style="background:#2e7d32"></i>Ingresos</span>
+        <span><i style="background:#d9822b"></i>Costes totales (CT)</span>
+        <span><i style="background:#6fa8dc"></i>Costes fijos (CF)</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card teoria">
+    <h2>Recuerda</h2>
+    <p>El <b>umbral de rentabilidad</b> (o punto muerto) es el volumen de producción o venta en el que los <b>ingresos totales son iguales a los costes totales</b>: no hay beneficio ni pérdidas.</p>
+    <p><b>Pv × Q = Cf + Cvu × Q</b> &nbsp;→&nbsp; <b>Q = Cf / (Pv − Cvu)</b></p>
+    <p>Como no se pueden vender fracciones de unidad, el resultado se <b>redondea siempre hacia arriba</b>.</p>
+  </section>
+</main>
+
+<footer>Logística de almacenamiento · Unidad 6</footer>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+
+  // Acepta "58.300", "58300", "71,80", "71.80", "1.234,5"
+  function leer(texto){
+    let t = String(texto || '').trim().replace(/\s|€/g,'');
+    if (t === '') return null;
+    if (t.includes(',')) {
+      t = t.replace(/\./g,'').replace(',', '.');
+    } else if (/^\d{1,3}(\.\d{3})+$/.test(t)) {
+      t = t.replace(/\./g,'');
+    }
+    const n = Number(t);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  const fmt = (n, dec=2) => n.toLocaleString('es-ES',{minimumFractionDigits:dec,maximumFractionDigits:dec,useGrouping:'always'});
+  const fmtU = n => n.toLocaleString('es-ES',{maximumFractionDigits:0,useGrouping:'always'});
+
+  function mostrarError(msg){
+    const e = $('error'); e.textContent = msg; e.style.display = 'block';
+    $('salida').style.display = 'none';
+  }
+
+  $('modoTotal').addEventListener('change', () => {
+    const total = $('modoTotal').checked;
+    $('bloqueCvu').style.display = total ? 'none' : 'block';
+    $('bloqueCvTotal').style.display = total ? 'block' : 'none';
+    $('prodNota').textContent = total ? '(obligatoria: sirve para calcular el Cvu)' : '(opcional)';
+  });
+
+  function calcular(){
+    $('error').style.display = 'none';
+    const total = $('modoTotal').checked;
+    const cf = leer($('cf').value);
+    const pv = leer($('pv').value);
+    const prod = leer($('prod').value);
+    let cvu, cvt = null;
+
+    if (cf === null || isNaN(cf) || cf < 0) return mostrarError('Introduce unos costes fijos válidos (número mayor o igual que 0).');
+    if (pv === null || isNaN(pv) || pv <= 0) return mostrarError('Introduce un precio de venta válido (mayor que 0).');
+    if (prod !== null && (isNaN(prod) || prod < 0)) return mostrarError('La producción debe ser un número mayor o igual que 0.');
+
+    if (total) {
+      cvt = leer($('cvt').value);
+      if (cvt === null || isNaN(cvt) || cvt < 0) return mostrarError('Introduce los costes variables totales.');
+      if (prod === null || prod <= 0) return mostrarError('Para calcular el Cvu necesito la producción (unidades).');
+      cvu = cvt / prod;
+    } else {
+      cvu = leer($('cvu').value);
+      if (cvu === null || isNaN(cvu) || cvu < 0) return mostrarError('Introduce un coste variable unitario válido.');
+    }
+
+    const mc = pv - cvu; // margen de contribución unitario
+    if (mc <= 0) return mostrarError('El precio de venta (' + fmt(pv) + ' €) no supera el coste variable unitario (' + fmt(cvu) + ' €). Cada unidad vendida genera pérdidas: no existe umbral de rentabilidad.');
+
+    const q = cf / mc;
+    const qU = Math.ceil(q - 1e-9);
+    const ingresosUR = qU * pv;
+
+    // Resultado principal
+    $('qRes').textContent = fmtU(qU) + ' unidades';
+    $('qSub').textContent = 'Resultado exacto: ' + fmt(q) + ' u → se redondea hacia arriba';
+
+    let filas = [
+      ['Margen de contribución unitario (Pv − Cvu)', fmt(mc) + ' €/u'],
+      ['Ingresos en el umbral (' + fmtU(qU) + ' × ' + fmt(pv) + ')', fmt(ingresosUR) + ' €']
+    ];
+    if (total) filas.unshift(['Coste variable unitario (CV / producción)', fmt(cvu) + ' €/u']);
+
+    let pasos = '';
+    pasos += 'Fórmula:  Pv × Q = Cf + Cvu × Q\n\n';
+    if (total) pasos += 'Cvu = CV / producción = ' + fmt(cvt) + ' / ' + fmtU(prod) + ' = ' + fmt(cvu) + ' €/u\n\n';
+    pasos += 'Sustituimos:  ' + fmt(pv) + ' × Q = ' + fmt(cf) + ' + ' + fmt(cvu) + ' × Q\n';
+    pasos += 'Despejamos:   Q = Cf / (Pv − Cvu)\n';
+    pasos += '              Q = ' + fmt(cf) + ' / (' + fmt(pv) + ' − ' + fmt(cvu) + ')\n';
+    pasos += '              Q = ' + fmt(cf) + ' / ' + fmt(mc) + ' = ' + fmt(q) + '\n\n';
+    pasos += 'Umbral de rentabilidad: Q = ' + fmtU(qU) + ' unidades\n';
+    pasos += 'Ingresos en el U. de R. = ' + fmtU(qU) + ' × ' + fmt(pv) + ' = ' + fmt(ingresosUR) + ' €';
+
+    const com = $('comentario');
+    if (prod !== null && prod > 0) {
+      const ingresos = prod * pv;
+      const cvTot = total ? cvt : cvu * prod;
+      const ct = cf + cvTot;
+      const margen = ingresos - ct;
+      const ctu = ct / prod;
+      filas.push(['Ingresos por ventas (' + fmtU(prod) + ' × ' + fmt(pv) + ')', fmt(ingresos) + ' €']);
+      filas.push(['Costes totales (Cf + CV)', fmt(ct) + ' €']);
+      filas.push(['Coste total unitario (CT / producción)', fmt(ctu) + ' €/u']);
+      filas.push(['Margen industrial', '<span class="' + (margen >= 0 ? 'positivo' : 'negativo') + '">' + fmt(margen) + ' €</span>']);
+
+      pasos += '\n\nMargen industrial = Ingresos − Costes totales\n';
+      pasos += '  Ingresos = ' + fmtU(prod) + ' × ' + fmt(pv) + ' = ' + fmt(ingresos) + ' €\n';
+      pasos += '  Costes totales = ' + fmt(cf) + ' + ' + fmt(cvTot) + ' = ' + fmt(ct) + ' €\n';
+      pasos += '  Margen industrial = ' + fmt(ingresos) + ' − ' + fmt(ct) + ' = ' + fmt(margen) + ' €';
+
+      if (prod > q + 1e-9) {
+        com.className = 'comentario ok';
+        com.textContent = 'La empresa produce ' + fmtU(prod) + ' unidades, por encima del umbral (' + fmtU(qU) + '): obtiene un beneficio de ' + fmt(margen) + ' €.';
+      } else if (Math.abs(prod - q) < 1e-9) {
+        com.className = 'comentario neutro';
+        com.textContent = 'La empresa produce justo en el umbral de rentabilidad: no tiene ni beneficio ni pérdidas.';
+      } else {
+        com.className = 'comentario mal';
+        com.textContent = 'La empresa produce ' + fmtU(prod) + ' unidades, por debajo del umbral (' + fmtU(qU) + '): tiene unas pérdidas de ' + fmt(Math.abs(margen)) + ' €. Aunque cada unidad deja ' + fmt(mc) + ' € de margen sobre el coste variable, su coste total unitario es ' + fmt(ctu) + ' €, mayor que el precio de venta.';
+      }
+    } else {
+      com.className = 'comentario neutro';
+      com.textContent = 'Por debajo de ' + fmtU(qU) + ' unidades la empresa tiene pérdidas; a partir de esa cantidad, beneficios. Indica la producción real para calcular el margen industrial.';
+    }
+
+    $('tabla').innerHTML = filas.map(f => '<tr><td>' + f[0] + '</td><td>' + f[1] + '</td></tr>').join('');
+    $('pasos').textContent = pasos;
+    dibujar(cf, pv, cvu, q, prod);
+    $('salida').style.display = 'block';
+    $('salida').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function dibujar(cf, pv, cvu, q, prod){
+    const W = 520, H = 340, ml = 70, mr = 20, mt = 20, mb = 46;
+    const xMax = Math.max(q, prod || 0) * 1.35 || 1;
+    const yMax = Math.max(pv * xMax, cf + cvu * xMax) * 1.05;
+    const X = v => ml + v / xMax * (W - ml - mr);
+    const Y = v => H - mb - v / yMax * (H - mt - mb);
+    const corto = n => n >= 1e6 ? fmt(n/1e6,1) + ' M' : n >= 1e3 ? fmt(n/1e3,1) + ' k' : fmt(n,0);
+
+    let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Gráfico del umbral de rentabilidad">';
+    // rejilla y ejes
+    for (let i = 0; i <= 4; i++) {
+      const v = yMax * i / 4;
+      s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e5eaf0"/>';
+      s += '<text x="' + (ml - 8) + '" y="' + (Y(v) + 4) + '" font-size="14" text-anchor="end" fill="#5d6b7a">' + corto(v) + ' €</text>';
+    }
+    s += '<line x1="' + ml + '" y1="' + mt + '" x2="' + ml + '" y2="' + (H - mb) + '" stroke="#1d2733"/>';
+    s += '<line x1="' + ml + '" y1="' + (H - mb) + '" x2="' + (W - mr) + '" y2="' + (H - mb) + '" stroke="#1d2733"/>';
+    s += '<text x="' + (W - mr) + '" y="' + (H - mb - 8) + '" font-size="14" text-anchor="end" fill="#5d6b7a">Producción / ventas (u)</text>';
+
+    // zonas de pérdidas y beneficios
+    s += '<polygon points="' + X(0) + ',' + Y(0) + ' ' + X(q) + ',' + Y(pv*q) + ' ' + X(0) + ',' + Y(cf) + '" fill="#c62828" opacity=".08"/>';
+    s += '<polygon points="' + X(q) + ',' + Y(pv*q) + ' ' + X(xMax) + ',' + Y(pv*xMax) + ' ' + X(xMax) + ',' + Y(cf+cvu*xMax) + '" fill="#2e7d32" opacity=".08"/>';
+    s += '<text x="' + X(q*0.35) + '" y="' + (Y(cf) - 8) + '" font-size="14" fill="#c62828" text-anchor="middle">Pérdidas</text>';
+    s += '<text x="' + X(q + (xMax-q)*0.75) + '" y="' + (Y(pv*xMax)+ (Y(cf+cvu*xMax)-Y(pv*xMax))/2 + 4) + '" font-size="14" fill="#2e7d32" text-anchor="middle">Beneficio</text>';
+
+    // líneas
+    s += '<line x1="' + X(0) + '" y1="' + Y(cf) + '" x2="' + X(xMax) + '" y2="' + Y(cf) + '" stroke="#6fa8dc" stroke-width="2.5"/>';
+    s += '<line x1="' + X(0) + '" y1="' + Y(cf) + '" x2="' + X(xMax) + '" y2="' + Y(cf + cvu*xMax) + '" stroke="#d9822b" stroke-width="2.5"/>';
+    s += '<line x1="' + X(0) + '" y1="' + Y(0) + '" x2="' + X(xMax) + '" y2="' + Y(pv*xMax) + '" stroke="#2e7d32" stroke-width="2.5"/>';
+
+    // punto muerto
+    s += '<line x1="' + X(q) + '" y1="' + Y(pv*q) + '" x2="' + X(q) + '" y2="' + (H-mb) + '" stroke="#1f4e79" stroke-dasharray="4 4"/>';
+    s += '<circle cx="' + X(q) + '" cy="' + Y(pv*q) + '" r="6" fill="#1f4e79"/>';
+    s += '<text x="' + X(q) + '" y="' + (H - mb + 16) + '" font-size="14" text-anchor="middle" fill="#1f4e79" font-weight="700">' + fmtU(Math.ceil(q - 1e-9)) + '</text>';
+    s += '<text x="' + (X(q) - 10) + '" y="' + (Y(pv*q) - 10) + '" font-size="14" text-anchor="end" fill="#1f4e79" font-weight="700">Umbral</text>';
+
+    // producción real
+    if (prod && prod > 0) {
+      const ing = pv*prod, ct = cf + cvu*prod;
+      s += '<line x1="' + X(prod) + '" y1="' + Y(Math.max(ing,ct)) + '" x2="' + X(prod) + '" y2="' + (H-mb) + '" stroke="#5d6b7a" stroke-dasharray="2 4"/>';
+      s += '<line x1="' + X(prod) + '" y1="' + Y(ing) + '" x2="' + X(prod) + '" y2="' + Y(ct) + '" stroke="' + (ing >= ct ? '#2e7d32' : '#c62828') + '" stroke-width="5" opacity=".7"/>';
+      const sep = Math.abs(X(prod) - X(q)) < 40 ? 30 : 16;
+      s += '<text x="' + X(prod) + '" y="' + (H - mb + sep) + '" font-size="14" text-anchor="middle" fill="#5d6b7a">' + fmtU(prod) + ' (real)</text>';
+    }
+    s += '</svg>';
+    $('grafico').innerHTML = s;
+  }
+
+  $('calcular').addEventListener('click', calcular);
+  document.querySelectorAll('input[inputmode]').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') calcular(); }));
+
+  $('limpiar').addEventListener('click', () => {
+    ['cf','pv','cvu','cvt','prod'].forEach(id => $(id).value = '');
+    $('modoTotal').checked = false; $('modoTotal').dispatchEvent(new Event('change'));
+    $('error').style.display = 'none';
+    $('salida').style.display = 'none';
+    $('cf').focus();
+  });
+
+  // Ejemplos de la Unidad 6 (se alternan)
+  const ejemplos = [
+    {nombre:'Actividad 6.7 · Empresa ZIBER', total:false, cf:'58.300', pv:'125', cvu:'71,80', prod:'1.000'},
+    {nombre:'Actividad propuesta 6.2 · Ruedas', total:true, cf:'15.000', pv:'18,90', cvt:'65.500', prod:'5.000'}
+  ];
+  let ej = 0;
+  $('ejemplo').addEventListener('click', () => {
+    const e = ejemplos[ej]; ej = (ej + 1) % ejemplos.length;
+    $('modoTotal').checked = e.total; $('modoTotal').dispatchEvent(new Event('change'));
+    $('cf').value = e.cf; $('pv').value = e.pv; $('prod').value = e.prod;
+    $('cvu').value = e.cvu || ''; $('cvt').value = e.cvt || '';
+    $('ejemplo').textContent = 'Cargar otro ejemplo';
+    calcular();
+    $('qSub').textContent += ' · ' + e.nombre;
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
